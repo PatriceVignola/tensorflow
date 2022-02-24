@@ -22,7 +22,6 @@ limitations under the License.
 // TODO(b/31496047): Fix non-standard include order.
 #include <numeric>  // clang-format off
 
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/bounds_check.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -42,6 +41,7 @@ limitations under the License.
 #include "tensorflow/core/platform/thread_annotations.h"
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/ptr_util.h"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -234,35 +234,31 @@ REGISTER_KERNEL_BUILDER(Name("TensorArrayV2").Device(DEVICE_CPU),
 REGISTER_KERNEL_BUILDER(Name("TensorArrayV3").Device(DEVICE_CPU),
                         TensorArrayOp);
 
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-
-#define REGISTER_GPU(type)                                   \
+#define REGISTER_DEVICE(type)                                \
   REGISTER_KERNEL_BUILDER(Name("TensorArray")                \
-                              .Device(DEVICE_GPU)            \
+                              .Device(DEVICE_DEFAULT)        \
                               .TypeConstraint<type>("dtype") \
                               .HostMemory("size")            \
                               .HostMemory("handle"),         \
                           TensorArrayOp);                    \
   REGISTER_KERNEL_BUILDER(Name("TensorArrayV2")              \
-                              .Device(DEVICE_GPU)            \
+                              .Device(DEVICE_DEFAULT)        \
                               .TypeConstraint<type>("dtype") \
                               .HostMemory("size")            \
                               .HostMemory("handle"),         \
                           TensorArrayOp);                    \
   REGISTER_KERNEL_BUILDER(Name("TensorArrayV3")              \
-                              .Device(DEVICE_GPU)            \
+                              .Device(DEVICE_DEFAULT)        \
                               .TypeConstraint<type>("dtype") \
                               .HostMemory("size")            \
                               .HostMemory("handle"),         \
                           TensorArrayOp);
 
-TF_CALL_int64(REGISTER_GPU);
-TF_CALL_bfloat16(REGISTER_GPU);
-TF_CALL_GPU_NUMBER_TYPES(REGISTER_GPU);
-TF_CALL_COMPLEX_TYPES(REGISTER_GPU);
-#undef REGISTER_GPU
-
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+TF_CALL_int64(REGISTER_DEVICE);
+TF_CALL_bfloat16(REGISTER_DEVICE);
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DEVICE);
+TF_CALL_COMPLEX_TYPES(REGISTER_DEVICE);
+#undef REGISTER_DEVICE
 
 // GRADIENT *******************************************************************
 // Note that this op may have an optional third input. If present, it represents
@@ -386,22 +382,22 @@ REGISTER_KERNEL_BUILDER(Name("TensorArrayGradV3").Device(DEVICE_CPU),
 REGISTER_KERNEL_BUILDER(Name("TensorArrayGradWithShape").Device(DEVICE_CPU),
                         TensorArrayGradOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayGrad")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("grad_handle"),
                         TensorArrayGradOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayGradV2")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("grad_handle"),
                         TensorArrayGradOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayGradV3")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("grad_handle"),
                         TensorArrayGradOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayGradWithShape")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("shape_to_prepend")
                             .HostMemory("grad_handle"),
@@ -774,32 +770,32 @@ TF_CALL_GPU_NUMBER_TYPES(REGISTER_GPU);
 TF_CALL_COMPLEX_TYPES(REGISTER_GPU);
 #undef REGISTER_GPU
 
-// A special GPU kernel for int32.
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+// A special DEVICE_DEFAULT kernel for int32.
 // TODO(b/25387198): Also enable int32 in device memory. This kernel
 // registration requires all int32 inputs and outputs to be in host memory.
 REGISTER_KERNEL_BUILDER(
     Name("TensorArrayGather")
-        .Device(DEVICE_GPU)
+        .Device(DEVICE_DEFAULT)
         .TypeConstraint<int32>("dtype")
         .HostMemory("indices")
         .HostMemory("handle"),
     TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
 REGISTER_KERNEL_BUILDER(
     Name("TensorArrayGatherV2")
-        .Device(DEVICE_GPU)
+        .Device(DEVICE_DEFAULT)
         .TypeConstraint<int32>("dtype")
         .HostMemory("indices")
         .HostMemory("handle"),
     TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
 REGISTER_KERNEL_BUILDER(
     Name("TensorArrayGatherV3")
-        .Device(DEVICE_GPU)
+        .Device(DEVICE_DEFAULT)
         .TypeConstraint<int32>("dtype")
         .HostMemory("indices")
         .HostMemory("handle"),
     TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
-
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 // CONCAT *********************************************************************
 
@@ -990,29 +986,29 @@ TF_CALL_GPU_NUMBER_TYPES(REGISTER_GPU);
 TF_CALL_COMPLEX_TYPES(REGISTER_GPU);
 #undef REGISTER_GPU
 
-// A special GPU kernel for int32.
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+// A special DEVICE_DEFAULT kernel for int32.
 // TODO(b/25387198): Also enable int32 in device memory. This kernel
 // registration requires all int32 inputs and outputs to be in host memory.
 REGISTER_KERNEL_BUILDER(Name("TensorArrayConcat")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .TypeConstraint<int32>("dtype")
                             .HostMemory("lengths")
                             .HostMemory("handle"),
                         TensorArrayConcatOp<CPUDevice, int32>);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV2")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .TypeConstraint<int32>("dtype")
                             .HostMemory("lengths")
                             .HostMemory("handle"),
                         TensorArrayConcatOp<CPUDevice, int32>);
 REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV3")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .TypeConstraint<int32>("dtype")
                             .HostMemory("lengths")
                             .HostMemory("handle"),
                         TensorArrayConcatOp<CPUDevice, int32>);
-
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 // UNPACK and SCATTER *********************************************************
 
@@ -1403,17 +1399,17 @@ REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV3").Device(DEVICE_CPU),
                         TensorArraySizeOp);
 
 REGISTER_KERNEL_BUILDER(Name("TensorArraySize")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("size"),
                         TensorArraySizeOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV2")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("size"),
                         TensorArraySizeOp);
 REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV3")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DEFAULT)
                             .HostMemory("handle")
                             .HostMemory("size"),
                         TensorArraySizeOp);
@@ -1453,13 +1449,13 @@ REGISTER_KERNEL_BUILDER(Name("TensorArrayCloseV3").Device(DEVICE_CPU),
                         TensorArrayCloseOp);
 
 REGISTER_KERNEL_BUILDER(
-    Name("TensorArrayClose").Device(DEVICE_GPU).HostMemory("handle"),
+    Name("TensorArrayClose").Device(DEVICE_DEFAULT).HostMemory("handle"),
     TensorArrayCloseOp);
 REGISTER_KERNEL_BUILDER(
-    Name("TensorArrayCloseV2").Device(DEVICE_GPU).HostMemory("handle"),
+    Name("TensorArrayCloseV2").Device(DEVICE_DEFAULT).HostMemory("handle"),
     TensorArrayCloseOp);
 REGISTER_KERNEL_BUILDER(
-    Name("TensorArrayCloseV3").Device(DEVICE_GPU).HostMemory("handle"),
+    Name("TensorArrayCloseV3").Device(DEVICE_DEFAULT).HostMemory("handle"),
     TensorArrayCloseOp);
 
 }  // namespace tensorflow
