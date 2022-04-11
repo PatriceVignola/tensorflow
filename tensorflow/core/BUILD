@@ -1595,6 +1595,7 @@ filegroup(
         "//tensorflow/core/framework:tensor_reference.h",
         "//tensorflow/core/framework:tracking_allocator.h",  # only needed for tests
         "//tensorflow/core/framework:variant.h",
+        "//tensorflow/core/framework:variant_ops.h",
         "//tensorflow/core/util:framework_internal_public_hdrs",
     ],
     visibility = ["//visibility:private"],

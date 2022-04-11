@@ -24,6 +24,9 @@ limitations under the License.
 #include "tensorflow/core/framework/resource_mgr.h"
 #include "tensorflow/core/framework/resource_var.h"
 #include "tensorflow/core/framework/variant.h"
+#include "tensorflow/core/framework/variant_ops.h"
+#include "tensorflow/core/kernels/list_kernels.h"
+#include "tensorflow/core/platform/abi.h"
 #include "tensorflow/core/platform/errors.h"
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/refcount.h"
@@ -390,4 +393,95 @@ bool TF_IsRefInput(TF_OpKernelContext* ctx, int i, TF_Status* status) {
   }
   TF_SetStatus(status, TF_OK, "");
   return cc_ctx->input_is_ref(i);
+}
+
+template <typename T>
+static Status ValidateVariantType(const Variant& variant) {
+  if (variant.get<::tensorflow::TensorList>() == nullptr) {
+    const std::string type_index_name =
+        ::tensorflow::port::MaybeAbiDemangle(variant.TypeId().name());
+
+    return ::tensorflow::errors::Internal(
+        "VariantBinaryOpFn: Could not access object 'a', type_index: ",
+        type_index_name);
+  }
+
+  return Status::OK();
+}
+
+void TF_AddNVariant(TF_OpKernelContext* ctx,
+                    void (*binary_add_func)(TF_OpKernelContext* ctx,
+                                            const TF_Tensor* a,
+                                            const TF_Tensor* b, TF_Tensor* out),
+                    TF_Status* status) {
+  auto* cc_ctx = reinterpret_cast<::tensorflow::OpKernelContext*>(ctx);
+
+  auto cc_binary_add_func = [binary_add_func](
+                                ::tensorflow::OpKernelContext* cc_ctx,
+                                const ::tensorflow::Tensor& cc_a,
+                                const ::tensorflow::Tensor& cc_b,
+                                ::tensorflow::Tensor* cc_out) {
+    auto* ctx = reinterpret_cast<TF_OpKernelContext*>(cc_ctx);
+
+    if (cc_a.dtype() == ::tensorflow::DT_INVALID) {
+      *cc_out = cc_b;
+      return Status::OK();
+    }
+    if (cc_b.dtype() == ::tensorflow::DT_INVALID) {
+      *cc_out = cc_a;
+      return Status::OK();
+    }
+
+    ::tensorflow::Status status;
+
+    const TF_Tensor* a = ::tensorflow::TF_TensorFromTensor(cc_a, &status);
+    TF_RETURN_IF_ERROR(status);
+
+    const TF_Tensor* b = ::tensorflow::TF_TensorFromTensor(cc_b, &status);
+    TF_RETURN_IF_ERROR(status);
+
+    ::tensorflow::AllocatorAttributes attr;
+    if (cc_a.dtype() == TF_VARIANT) {
+      attr.set_on_host(true);
+    }
+    TF_RETURN_IF_ERROR(
+        cc_ctx->allocate_temp(cc_a.dtype(), cc_a.shape(), cc_out, attr));
+
+    TF_Tensor* out = ::tensorflow::TF_TensorFromTensor(*cc_out, &status);
+    TF_RETURN_IF_ERROR(status);
+
+    binary_add_func(ctx, a, b, out);
+    return ::tensorflow::Status::OK();
+  };
+
+  auto binary_add_variant = [cc_binary_add_func](
+                                ::tensorflow::OpKernelContext* cc_ctx,
+                                const ::tensorflow::Variant& a,
+                                const ::tensorflow::Variant& b,
+                                ::tensorflow::Variant* out) {
+    DCHECK_NE(out, nullptr);
+    if (a.TypeId() != b.TypeId()) {
+      return ::tensorflow::errors::Internal(
+          "BinaryOpVariants: Variants a and b have different "
+          "type ids.  Type names: '",
+          a.TypeName(), "' vs. '", b.TypeName(), "'");
+    }
+
+    if (a.TypeId() == tensorflow::TypeIndex::Make<::tensorflow::TensorList>()) {
+      TF_RETURN_IF_ERROR(ValidateVariantType<::tensorflow::TensorList>(a));
+      *out = ::tensorflow::TensorList();
+
+      return ::tensorflow::TensorListBinaryAdd(
+          cc_ctx, *a.get<::tensorflow::TensorList>(),
+          *b.get<::tensorflow::TensorList>(),
+          out->get<::tensorflow::TensorList>(), cc_binary_add_func);
+    }
+
+    const std::string type_index_name =
+        ::tensorflow::port::MaybeAbiDemangle(a.TypeId().name());
+
+    return ::tensorflow::errors::Internal(
+        "AddN is not supported for Variant type '", type_index_name, "'");
+  };
+  AddNVariant(cc_ctx, binary_add_variant);
 }

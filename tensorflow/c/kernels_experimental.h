@@ -116,6 +116,12 @@ TF_CAPI_EXPORT extern void TF_OpKernelConstruction_GetAttrTensorShape(
 TF_CAPI_EXPORT extern bool TF_IsRefInput(TF_OpKernelContext* ctx, int i,
                                          TF_Status* status);
 
+TF_CAPI_EXPORT extern void TF_AddNVariant(
+    TF_OpKernelContext* ctx,
+    void (*binary_add_func)(TF_OpKernelContext* ctx, const TF_Tensor* a,
+                            const TF_Tensor* b, TF_Tensor* out),
+    TF_Status* status);
+
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif
