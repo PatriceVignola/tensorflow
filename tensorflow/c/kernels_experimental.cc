@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/core/framework/resource_var.h"
 #include "tensorflow/core/framework/variant.h"
 #include "tensorflow/core/framework/variant_ops.h"
+#include "tensorflow/core/kernels/data/optional_ops.h"
 #include "tensorflow/core/kernels/list_kernels.h"
 #include "tensorflow/core/platform/abi.h"
 #include "tensorflow/core/platform/errors.h"
@@ -355,8 +356,7 @@ void TF_GetInputByName(TF_OpKernelContext* ctx, const char* inputName,
     ::tensorflow::Set_TF_Status_from_Status(status, s);
     return;
   }
-  TF_Tensor* result =
-      ::tensorflow::TF_TensorFromTensor(*cc_tensor, &status->status);
+  TF_Tensor* result = TF_TensorFromTensor(*cc_tensor, &status->status);
   if (TF_GetCode(status) == TF_OK) {
     *tensor = result;
   }
@@ -418,11 +418,8 @@ void TF_AddNVariant(TF_OpKernelContext* ctx,
 
   auto cc_binary_add_func = [binary_add_func](
                                 ::tensorflow::OpKernelContext* cc_ctx,
-                                const ::tensorflow::Tensor& cc_a,
-                                const ::tensorflow::Tensor& cc_b,
-                                ::tensorflow::Tensor* cc_out) {
-    auto* ctx = reinterpret_cast<TF_OpKernelContext*>(cc_ctx);
-
+                                const Tensor& cc_a, const Tensor& cc_b,
+                                Tensor* cc_out) {
     if (cc_a.dtype() == ::tensorflow::DT_INVALID) {
       *cc_out = cc_b;
       return Status::OK();
@@ -432,12 +429,12 @@ void TF_AddNVariant(TF_OpKernelContext* ctx,
       return Status::OK();
     }
 
-    ::tensorflow::Status status;
+    Status status;
 
-    const TF_Tensor* a = ::tensorflow::TF_TensorFromTensor(cc_a, &status);
+    const TF_Tensor* a = TF_TensorFromTensor(cc_a, &status);
     TF_RETURN_IF_ERROR(status);
 
-    const TF_Tensor* b = ::tensorflow::TF_TensorFromTensor(cc_b, &status);
+    const TF_Tensor* b = TF_TensorFromTensor(cc_b, &status);
     TF_RETURN_IF_ERROR(status);
 
     ::tensorflow::AllocatorAttributes attr;
@@ -447,18 +444,18 @@ void TF_AddNVariant(TF_OpKernelContext* ctx,
     TF_RETURN_IF_ERROR(
         cc_ctx->allocate_temp(cc_a.dtype(), cc_a.shape(), cc_out, attr));
 
-    TF_Tensor* out = ::tensorflow::TF_TensorFromTensor(*cc_out, &status);
+    TF_Tensor* out = TF_TensorFromTensor(*cc_out, &status);
     TF_RETURN_IF_ERROR(status);
 
+    auto* ctx = reinterpret_cast<TF_OpKernelContext*>(cc_ctx);
     binary_add_func(ctx, a, b, out);
-    return ::tensorflow::Status::OK();
+    return cc_ctx->status();
   };
 
   auto binary_add_variant = [cc_binary_add_func](
                                 ::tensorflow::OpKernelContext* cc_ctx,
-                                const ::tensorflow::Variant& a,
-                                const ::tensorflow::Variant& b,
-                                ::tensorflow::Variant* out) {
+                                const Variant& a, const Variant& b,
+                                Variant* out) {
     DCHECK_NE(out, nullptr);
     if (a.TypeId() != b.TypeId()) {
       return ::tensorflow::errors::Internal(
@@ -475,13 +472,125 @@ void TF_AddNVariant(TF_OpKernelContext* ctx,
           cc_ctx, *a.get<::tensorflow::TensorList>(),
           *b.get<::tensorflow::TensorList>(),
           out->get<::tensorflow::TensorList>(), cc_binary_add_func);
+    } else if (a.TypeId() == tensorflow::TypeIndex::Make<
+                                 ::tensorflow::data::OptionalVariant>()) {
+      TF_RETURN_IF_ERROR(
+          ValidateVariantType<::tensorflow::data::OptionalVariant>(a));
+      *out = ::tensorflow::data::OptionalVariant();
+
+      return ::tensorflow::data::OptionalBinaryAdd(
+          cc_ctx, *a.get<::tensorflow::data::OptionalVariant>(),
+          *b.get<::tensorflow::data::OptionalVariant>(),
+          out->get<::tensorflow::data::OptionalVariant>(), cc_binary_add_func);
     }
 
     const std::string type_index_name =
         ::tensorflow::port::MaybeAbiDemangle(a.TypeId().name());
 
     return ::tensorflow::errors::Internal(
-        "AddN is not supported for Variant type '", type_index_name, "'");
+        "No unary variant binary_op function found for op ADD Variant "
+        "type_name: ",
+        type_index_name, " for device type: ", cc_ctx->device()->name());
   };
   AddNVariant(cc_ctx, binary_add_variant);
+  ::tensorflow::Set_TF_Status_from_Status(status, cc_ctx->status());
+}
+
+static Status ZerosLikeVariant(::tensorflow::OpKernelContext* cc_ctx,
+                               const Variant& input, Variant* out,
+                               void (*zeros_like_func)(TF_OpKernelContext* ctx,
+                                                       const TF_Tensor* input,
+                                                       TF_Tensor* out)) {
+  auto cc_zeros_like_func = [zeros_like_func](
+                                ::tensorflow::OpKernelContext* cc_ctx,
+                                const Tensor& cc_input, Tensor* cc_out) {
+    AllocatorAttributes attr;
+    if (cc_input.dtype() == ::tensorflow::DT_VARIANT) {
+      attr.set_on_host(true);
+    }
+    TF_RETURN_IF_ERROR(cc_ctx->allocate_temp(cc_input.dtype(), cc_input.shape(),
+                                             cc_out, attr));
+
+    switch (cc_input.dtype()) {
+      case ::tensorflow::DT_INVALID: {
+        *cc_out = Tensor(::tensorflow::DT_INVALID);
+        break;
+      }
+      case ::tensorflow::DT_VARIANT: {
+        // If the wrapped tensor is also a variant, recursively call
+        // ZerosLikeVariant to unwrap it the same way
+        Variant* out_variant = cc_out->scalar<Variant>().data();
+        TF_RETURN_IF_ERROR(ZerosLikeVariant(cc_ctx,
+                                            cc_input.scalar<Variant>()(),
+                                            out_variant, zeros_like_func));
+        break;
+      }
+      default: {
+        Status status;
+        const TF_Tensor* input = TF_TensorFromTensor(cc_input, &status);
+        TF_RETURN_IF_ERROR(status);
+
+        TF_Tensor* out = TF_TensorFromTensor(*cc_out, &status);
+        TF_RETURN_IF_ERROR(status);
+
+        auto* ctx = reinterpret_cast<TF_OpKernelContext*>(cc_ctx);
+        zeros_like_func(ctx, input, out);
+      }
+    }
+    return cc_ctx->status();
+  };
+
+  DCHECK_NE(out, nullptr);
+
+  if (input.TypeId() ==
+      tensorflow::TypeIndex::Make<::tensorflow::TensorList>()) {
+    TF_RETURN_IF_ERROR(ValidateVariantType<::tensorflow::TensorList>(input));
+    *out = ::tensorflow::TensorList();
+
+    return ::tensorflow::TensorListZerosLike(
+        cc_ctx, *input.get<::tensorflow::TensorList>(),
+        out->get<::tensorflow::TensorList>(), cc_zeros_like_func);
+  } else if (input.TypeId() == tensorflow::TypeIndex::Make<
+                                   ::tensorflow::data::OptionalVariant>()) {
+    TF_RETURN_IF_ERROR(
+        ValidateVariantType<::tensorflow::data::OptionalVariant>(input));
+    *out = ::tensorflow::data::OptionalVariant();
+
+    return ::tensorflow::data::OptionalZerosLike(
+        cc_ctx, *input.get<::tensorflow::data::OptionalVariant>(),
+        out->get<::tensorflow::data::OptionalVariant>(), cc_zeros_like_func);
+  }
+
+  const std::string type_index_name =
+      ::tensorflow::port::MaybeAbiDemangle(input.TypeId().name());
+
+  return ::tensorflow::errors::Internal(
+      "No unary variant unary_op function found for op ZEROS_LIKE Variant "
+      "type_name: ",
+      type_index_name, " for device type: ", cc_ctx->device()->name());
+};
+
+void TF_ZerosLikeVariant(TF_OpKernelContext* ctx,
+                         void (*zeros_like_func)(TF_OpKernelContext* ctx,
+                                                 const TF_Tensor* input,
+                                                 TF_Tensor* out),
+                         TF_Status* status) {
+  auto* cc_ctx = reinterpret_cast<::tensorflow::OpKernelContext*>(ctx);
+
+  const Tensor& input = cc_ctx->input(0);
+  OP_REQUIRES(cc_ctx, input.dims() == 0,
+              InvalidArgument(
+                  "ZerosLike non-scalar Tensor with dtype=DT_VARIANT is not "
+                  "supported."));
+  const Variant& v = input.scalar<Variant>()();
+  // DT_VARIANT tensors must be allocated on CPU since they wrap C++
+  // objects which can not be efficiently represented in GPU memory.
+  int numa_node = cc_ctx->device()->NumaNode();
+  Tensor out(::tensorflow::cpu_allocator(numa_node), ::tensorflow::DT_VARIANT,
+             ::tensorflow::TensorShape({}));
+  Variant* out_v = &(out.scalar<Variant>()());
+  Status cc_status = ZerosLikeVariant(cc_ctx, v, out_v, zeros_like_func);
+  ::tensorflow::Set_TF_Status_from_Status(status, cc_status);
+  OP_REQUIRES_OK(cc_ctx, cc_status);
+  cc_ctx->set_output(0, out);
 }

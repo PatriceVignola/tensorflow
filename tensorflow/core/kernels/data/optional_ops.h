@@ -104,52 +104,29 @@ class OptionalVariant {
   std::shared_ptr<const std::vector<Tensor>> values_;
 };
 
+Status OptionalZerosLike(OpKernelContext* ctx, const OptionalVariant& x,
+                         OptionalVariant* y,
+                         std::function<Status(OpKernelContext* ctx,
+                                              const Tensor& input, Tensor* out)>
+                             zeros_like_func);
+
 template <typename Device>
 Status OptionalZerosLike(OpKernelContext* ctx, const OptionalVariant& x,
                          OptionalVariant* y) {
-  if (!x.has_value()) {
-    *y = x;
-    return Status::OK();
-  }
-  std::vector<Tensor> zero_tensors;
-  for (const Tensor& tensor : x.get_values()) {
-    Tensor zero_t;
-    TF_RETURN_IF_ERROR(ZerosLikeTensor<Device>(ctx, tensor, &zero_t));
-    zero_tensors.push_back(std::move(zero_t));
-  }
-  *y = OptionalVariant(zero_tensors);
-  return Status::OK();
+  return OptionalZerosLike(ctx, x, y, ZerosLikeTensor<Device>);
 }
+
+Status OptionalBinaryAdd(
+    OpKernelContext* ctx, const OptionalVariant& a, const OptionalVariant& b,
+    OptionalVariant* out,
+    std::function<Status(OpKernelContext* ctx, const Tensor& a, const Tensor& b,
+                         Tensor* out)>
+        binary_add_func);
 
 template <typename Device>
 Status OptionalBinaryAdd(OpKernelContext* ctx, const OptionalVariant& a,
                          const OptionalVariant& b, OptionalVariant* out) {
-  // TODO(skyewm): should adding a value to a non-value be a no-op instead?
-  if (a.has_value() != b.has_value()) {
-    return errors::InvalidArgument(
-        "Cannot add optionals because one has a value and the other doesn't.");
-  }
-  if (!a.has_value()) {
-    *out = a;
-    return Status::OK();
-  }
-  if (a.get_values().size() != b.get_values().size()) {
-    return errors::InvalidArgument(
-        "Cannot add optionals because they have different numbers of "
-        "components (",
-        a.get_values().size(), " vs. ", b.get_values().size(), ").");
-  }
-  std::vector<Tensor> out_tensors;
-  for (int i = 0; i < a.get_values().size(); ++i) {
-    const Tensor& a_tensor = a.get_values()[i];
-    const Tensor& b_tensor = b.get_values()[i];
-    Tensor out_tensor;
-    TF_RETURN_IF_ERROR(
-        BinaryAddTensors<Device>(ctx, a_tensor, b_tensor, &out_tensor));
-    out_tensors.push_back(std::move(out_tensor));
-  }
-  *out = OptionalVariant(out_tensors);
-  return Status::OK();
+  return OptionalBinaryAdd(ctx, a, b, out, BinaryAddTensors<Device>);
 }
 
 class OptionalNoneOp : public OpKernel {

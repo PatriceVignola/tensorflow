@@ -957,29 +957,22 @@ Status TensorListBinaryAdd(
                          Tensor* out)>
         binary_add_func);
 
-template <typename BinaryAddTensorsFunctor>
+template <typename Device>
 Status TensorListBinaryAdd(OpKernelContext* c, const TensorList& a,
                            const TensorList& b, TensorList* out) {
-  auto binary_add_func = [](OpKernelContext* c, const Tensor& a,
-                            const Tensor& b, Tensor* out) {
-    return BinaryAddTensorsFunctor()(c, a, b, out);
-  };
-
-  return TensorListBinaryAdd(c, a, b, out, binary_add_func);
+  return TensorListBinaryAdd(c, a, b, out, BinaryAddTensors<Device>);
 }
+
+Status TensorListZerosLike(
+    OpKernelContext* c, const TensorList& x, TensorList* y,
+    std::function<Status(OpKernelContext* ctx, const Tensor& input,
+                         Tensor* out)>
+        zeros_like_func);
 
 template <typename Device>
 Status TensorListZerosLike(OpKernelContext* c, const TensorList& x,
                            TensorList* y) {
-  y->element_dtype = x.element_dtype;
-  y->element_shape = x.element_shape;
-  y->tensors().reserve(x.tensors().size());
-  for (const Tensor& t : x.tensors()) {
-    Tensor out_tensor;
-    TF_RETURN_IF_ERROR(ZerosLikeTensor<Device>(c, t, &out_tensor));
-    y->tensors().emplace_back(out_tensor);
-  }
-  return Status::OK();
+  return TensorListZerosLike(c, x, y, ZerosLikeTensor<Device>);
 }
 
 template <typename Device, typename T>

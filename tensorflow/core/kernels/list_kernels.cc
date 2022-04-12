@@ -626,6 +626,22 @@ Status TensorListBinaryAdd(
   return Status::OK();
 }
 
+Status TensorListZerosLike(
+    OpKernelContext* c, const TensorList& x, TensorList* y,
+    std::function<Status(OpKernelContext* ctx, const Tensor& input,
+                         Tensor* out)>
+        zeros_like_func) {
+  y->element_dtype = x.element_dtype;
+  y->element_shape = x.element_shape;
+  y->tensors().reserve(x.tensors().size());
+  for (const Tensor& t : x.tensors()) {
+    Tensor out_tensor;
+    TF_RETURN_IF_ERROR(zeros_like_func(c, t, &out_tensor));
+    y->tensors().emplace_back(out_tensor);
+  }
+  return Status::OK();
+}
+
 REGISTER_KERNEL_BUILDER(Name("TensorListConcatLists").Device(DEVICE_CPU),
                         TensorListConcatLists);
 
@@ -701,16 +717,9 @@ REGISTER_TENSOR_LIST_OPS_CPU(Variant);
 
 #define REGISTER_TENSOR_LIST_OPS_CPU(T)
 
-struct BinaryAddTensorsCpuFunctor {
-  Status operator()(OpKernelContext* ctx, const Tensor& a, const Tensor& b,
-                    Tensor* out) {
-    return BinaryAddTensors<CPUDevice>(ctx, a, b, out);
-  }
-};
-
-REGISTER_UNARY_VARIANT_BINARY_OP_FUNCTION(
-    ADD_VARIANT_BINARY_OP, DEVICE_CPU, TensorList,
-    TensorListBinaryAdd<BinaryAddTensorsCpuFunctor>);
+REGISTER_UNARY_VARIANT_BINARY_OP_FUNCTION(ADD_VARIANT_BINARY_OP, DEVICE_CPU,
+                                          TensorList,
+                                          TensorListBinaryAdd<CPUDevice>);
 
 REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                                          DEVICE_CPU, TensorList,

@@ -657,6 +657,7 @@ tf_cuda_library(
         "//tensorflow/core:framework",
         "//tensorflow/core:framework_internal_impl",
         "//tensorflow/core/kernels:list_kernels",
+        "//tensorflow/core/kernels/data:optional_ops",
         "//tensorflow/core/platform:errors",
         "//tensorflow/core/platform:mutex",
         "//tensorflow/core/platform:refcount",

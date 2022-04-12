@@ -122,6 +122,12 @@ TF_CAPI_EXPORT extern void TF_AddNVariant(
                             const TF_Tensor* b, TF_Tensor* out),
     TF_Status* status);
 
+TF_CAPI_EXPORT extern void TF_ZerosLikeVariant(
+    TF_OpKernelContext* ctx,
+    void (*zeros_like_func)(TF_OpKernelContext* ctx, const TF_Tensor* input,
+                            TF_Tensor* out),
+    TF_Status* status);
+
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif

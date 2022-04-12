@@ -118,16 +118,9 @@ REGISTER_KERNEL_BUILDER(Name("TensorListPopBack")
                             .HostMemory("element_shape"),
                         TensorListPopBack<GPUDevice, Variant>)
 
-struct BinaryAddTensorsGpuFunctor {
-  Status operator()(OpKernelContext* ctx, const Tensor& a, const Tensor& b,
-                    Tensor* out) {
-    return BinaryAddTensors<GPUDevice>(ctx, a, b, out);
-  }
-};
-
-REGISTER_UNARY_VARIANT_BINARY_OP_FUNCTION(
-    ADD_VARIANT_BINARY_OP, DEVICE_GPU, TensorList,
-    TensorListBinaryAdd<BinaryAddTensorsGpuFunctor>);
+REGISTER_UNARY_VARIANT_BINARY_OP_FUNCTION(ADD_VARIANT_BINARY_OP, DEVICE_GPU,
+                                          TensorList,
+                                          TensorListBinaryAdd<GPUDevice>);
 REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                                          DEVICE_GPU, TensorList,
                                          TensorListZerosLike<GPUDevice>);
