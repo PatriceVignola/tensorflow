@@ -10,8 +10,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef TENSORFLOW_CORE_FRAMEWORK_REF_VAR_H_
-#define TENSORFLOW_CORE_FRAMEWORK_REF_VAR_H_
+#ifndef TENSORFLOW_CORE_FRAMEWORK_VARIANT_OPS_H_
+#define TENSORFLOW_CORE_FRAMEWORK_VARIANT_OPS_H_
 
 #include <functional>
 
@@ -23,8 +23,8 @@ class Status;
 
 void AddNVariant(OpKernelContext* context,
                  std::function<Status(OpKernelContext*, const Variant&,
-                                    const Variant&, Variant*)>
+                                      const Variant&, Variant*)>
                      binary_add_variant);
 }  //  end namespace tensorflow
 
-#endif  // TENSORFLOW_CORE_FRAMEWORK_REF_VAR_H_
+#endif  // TENSORFLOW_CORE_FRAMEWORK_VARIANT_OPS_H_
