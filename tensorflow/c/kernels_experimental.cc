@@ -492,7 +492,7 @@ void TF_AddNVariant(TF_OpKernelContext* ctx,
         "type_name: ",
         type_index_name, " for device type: ", cc_ctx->device()->name());
   };
-  AddNVariant(cc_ctx, binary_add_variant);
+  ::tensorflow::AddNVariant(cc_ctx, binary_add_variant);
   ::tensorflow::Set_TF_Status_from_Status(status, cc_ctx->status());
 }
 
