@@ -120,89 +120,99 @@ Status PyArray_TYPE_to_TF_DataType(PyArrayObject* array,
                                    TF_DataType* out_tf_datatype) {
   int pyarray_type = PyArray_TYPE(array);
   PyArray_Descr* descr = PyArray_DESCR(array);
-  switch (pyarray_type) {
-    case NPY_FLOAT16:
-      *out_tf_datatype = TF_HALF;
-      break;
-    case NPY_FLOAT32:
-      *out_tf_datatype = TF_FLOAT;
-      break;
-    case NPY_FLOAT64:
-      *out_tf_datatype = TF_DOUBLE;
-      break;
-    case NPY_INT32:
-      *out_tf_datatype = TF_INT32;
-      break;
-    case NPY_UINT8:
-      *out_tf_datatype = TF_UINT8;
-      break;
-    case NPY_UINT16:
-      *out_tf_datatype = TF_UINT16;
-      break;
-    case NPY_UINT32:
-      *out_tf_datatype = TF_UINT32;
-      break;
-    case NPY_UINT64:
-      *out_tf_datatype = TF_UINT64;
-      break;
-    case NPY_INT8:
-      *out_tf_datatype = TF_INT8;
-      break;
-    case NPY_INT16:
-      *out_tf_datatype = TF_INT16;
-      break;
-    case NPY_INT64:
-      *out_tf_datatype = TF_INT64;
-      break;
-    case NPY_BOOL:
-      *out_tf_datatype = TF_BOOL;
-      break;
-    case NPY_COMPLEX64:
-      *out_tf_datatype = TF_COMPLEX64;
-      break;
-    case NPY_COMPLEX128:
-      *out_tf_datatype = TF_COMPLEX128;
-      break;
-    case NPY_OBJECT:
-    case NPY_STRING:
-    case NPY_UNICODE:
-      *out_tf_datatype = TF_STRING;
-      break;
-    case NPY_VOID:
-      // Quantized types are currently represented as custom struct types.
-      // PyArray_TYPE returns NPY_VOID for structs, and we should look into
-      // descr to derive the actual type.
-      // Direct feeds of certain types of ResourceHandles are represented as a
-      // custom struct type.
-      return PyArrayDescr_to_TF_DataType(descr, out_tf_datatype);
-    default:
-      if (pyarray_type == Bfloat16NumpyType()) {
-        *out_tf_datatype = TF_BFLOAT16;
+
+  // The numpy int/long data types need to be handled before the numpy
+  // fixed-size data types since the latter can have different values based on
+  // the platform. For example, on Windows, NPY_INT32 will have the same value
+  // as NPY_LONG, but we actually want it to be converted to TF_INT64.
+  if (pyarray_type == Bfloat16NumpyType()) {
+    *out_tf_datatype = TF_BFLOAT16;
+  } else if (pyarray_type == NPY_ULONGLONG) {
+    // NPY_ULONGLONG is equivalent to NPY_UINT64, while their enum values
+    // might be different on certain platforms.
+    *out_tf_datatype = TF_UINT64;
+  } else if (pyarray_type == NPY_LONGLONG) {
+    // NPY_LONGLONG is equivalent to NPY_INT64, while their enum values
+    // might be different on certain platforms.
+    *out_tf_datatype = TF_INT64;
+  } else if (pyarray_type == NPY_ULONG) {
+    // NPY_ULONG is equivalent to NPY_UINT64, while their enum values
+    // might be different on certain platforms.
+    *out_tf_datatype = TF_UINT64;
+  } else if (pyarray_type == NPY_LONG) {
+    // NPY_LONG is equivalent to NPY_INT64, while their enum values
+    // might be different on certain platforms.
+    *out_tf_datatype = TF_INT64;
+  } else if (pyarray_type == NPY_INT) {
+    // NPY_INT is equivalent to NPY_INT32, while their enum values might be
+    // different on certain platforms.
+    *out_tf_datatype = TF_INT32;
+  } else if (pyarray_type == NPY_UINT) {
+    // NPY_UINT is equivalent to NPY_UINT32, while their enum values might
+    // be different on certain platforms.
+    *out_tf_datatype = TF_UINT32;
+  } else {
+    switch (pyarray_type) {
+      case NPY_FLOAT16:
+        *out_tf_datatype = TF_HALF;
         break;
-      } else if (pyarray_type == NPY_ULONGLONG) {
-        // NPY_ULONGLONG is equivalent to NPY_UINT64, while their enum values
-        // might be different on certain platforms.
-        *out_tf_datatype = TF_UINT64;
+      case NPY_FLOAT32:
+        *out_tf_datatype = TF_FLOAT;
         break;
-      } else if (pyarray_type == NPY_LONGLONG) {
-        // NPY_LONGLONG is equivalent to NPY_INT64, while their enum values
-        // might be different on certain platforms.
-        *out_tf_datatype = TF_INT64;
+      case NPY_FLOAT64:
+        *out_tf_datatype = TF_DOUBLE;
         break;
-      } else if (pyarray_type == NPY_INT) {
-        // NPY_INT is equivalent to NPY_INT32, while their enum values might be
-        // different on certain platforms.
+      case NPY_INT32:
         *out_tf_datatype = TF_INT32;
         break;
-      } else if (pyarray_type == NPY_UINT) {
-        // NPY_UINT is equivalent to NPY_UINT32, while their enum values might
-        // be different on certain platforms.
+      case NPY_UINT8:
+        *out_tf_datatype = TF_UINT8;
+        break;
+      case NPY_UINT16:
+        *out_tf_datatype = TF_UINT16;
+        break;
+      case NPY_UINT32:
         *out_tf_datatype = TF_UINT32;
         break;
-      }
-      return errors::Internal("Unsupported numpy type: ",
-                              numpy_type_name(pyarray_type));
+      case NPY_UINT64:
+        *out_tf_datatype = TF_UINT64;
+        break;
+      case NPY_INT8:
+        *out_tf_datatype = TF_INT8;
+        break;
+      case NPY_INT16:
+        *out_tf_datatype = TF_INT16;
+        break;
+      case NPY_INT64:
+        *out_tf_datatype = TF_INT64;
+        break;
+      case NPY_BOOL:
+        *out_tf_datatype = TF_BOOL;
+        break;
+      case NPY_COMPLEX64:
+        *out_tf_datatype = TF_COMPLEX64;
+        break;
+      case NPY_COMPLEX128:
+        *out_tf_datatype = TF_COMPLEX128;
+        break;
+      case NPY_OBJECT:
+      case NPY_STRING:
+      case NPY_UNICODE:
+        *out_tf_datatype = TF_STRING;
+        break;
+      case NPY_VOID:
+        // Quantized types are currently represented as custom struct types.
+        // PyArray_TYPE returns NPY_VOID for structs, and we should look into
+        // descr to derive the actual type.
+        // Direct feeds of certain types of ResourceHandles are represented as a
+        // custom struct type.
+        return PyArrayDescr_to_TF_DataType(descr, out_tf_datatype);
+      default:
+        return errors::Internal("Unsupported numpy type: ",
+                                numpy_type_name(pyarray_type));
+    }
   }
+
   return OkStatus();
 }
 
@@ -515,7 +525,7 @@ Status NdarrayToTensor(TFE_Context* ctx, PyObject* ndarray,
     }
 
   } else if (dtype != TF_STRING) {
-    size_t size = PyArray_NBYTES(array);
+    size_t size = TF_DataTypeSize(dtype) * PyArray_SIZE(array);
     array_safe.release();
     if (ctx) {
       *ret = make_safe(new TF_Tensor{tensorflow::unwrap(ctx)->CreateTensor(
