@@ -246,7 +246,9 @@ Allocator* PluggableDevice::GetAllocator(AllocatorAttributes attr) {
     if (attr.gpu_compatible() || force_gpu_compatible_) {
       PluggableDeviceProcessState* ps =
           PluggableDeviceProcessState::singleton(device_type(), platform_name_);
-      return ps->GetPluggableDeviceHostAllocator(0);
+      auto abc = ps->GetPluggableDeviceHostAllocator(0);
+      abc->AllocateRaw(0, 4);
+      return abc;
     } else {
       return cpu_allocator_;
     }
@@ -362,6 +364,7 @@ Status PluggableDevice::MaybeCopyTensorToPluggableDevice(
 Status PluggableDevice::MakeTensorFromProto(
     const TensorProto& tensor_proto, const AllocatorAttributes alloc_attrs,
     Tensor* tensor) {
+  printf("*********************MakeTensorFromProto tensor->data(): %p\n", tensor->data());
   AllocatorAttributes attr;
   attr.set_on_host(true);
   attr.set_gpu_compatible(true);

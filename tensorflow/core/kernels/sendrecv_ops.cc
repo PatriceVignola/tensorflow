@@ -90,6 +90,11 @@ void SendOp::Compute(OpKernelContext* ctx) {
   args.device_context = ctx->op_device_context();
   args.alloc_attrs = ctx->input_alloc_attr(0);
 
+  VLOG(1) << "********************SendOp::Compute: "
+             "args.alloc_attrs.on_host()="
+          << args.alloc_attrs.on_host()
+          << ", ctx->input(0).data()=" << ctx->input(0).data();
+
   FrameAndIter frame_iter = GetFrameAndIter(ctx, hostmem_sendrecv_);
   if (frame_iter == FrameAndIter(0, 0)) {
     // Use the cached rendezvous key.

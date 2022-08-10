@@ -148,6 +148,8 @@ void IntraProcessRecvAsyncImpl(const DeviceMgr* device_mgr,
         // preserve the uninitialized state, along with data type and shape
         // info, which is useful for debugger purposes.
         Tensor* out = in.IsInitialized() ? new Tensor : new Tensor(in);
+        printf("IntraProcessRecvAsyncImpl: in.data(): %p\n", in.data());
+        printf("IntraProcessRecvAsyncImpl: out->data(): %p\n", out->data());
 
         auto final_callback = [send_args, recv_args, out, is_dead,
                                done = std::move(done)](const Status& s) {
@@ -176,6 +178,9 @@ Status RefCountedIntraProcessRendezvous::Send(const ParsedKey& key,
                                               const Rendezvous::Args& args,
                                               const Tensor& val,
                                               const bool is_dead) {
+  VLOG(1) << "********************RefCountedIntraProcessRendezvous::Send: "
+             "args.alloc_attrs.on_host()="
+          << args.alloc_attrs.on_host() << ", val.data()=" << val.data();
   VLOG(1) << "IntraProcessRendezvous Send " << this << " " << key.FullKey();
   return local_.Send(key, args, val, is_dead);
 }

@@ -141,6 +141,8 @@ Allocator* PluggableDeviceProcessState::GetPluggableDeviceHostAllocator(
     int numa_node) {
   DCHECK(process_state_);
   if (!HasPluggableDevice()) {
+    VLOG(1) << "************PluggableDeviceProcessState::"
+               "GetPluggableDeviceHostAllocator 0";
     return process_state_->GetCPUAllocator(numa_node);
   }
   if (numa_node == port::kNUMANoAffinity) {
@@ -154,9 +156,14 @@ Allocator* PluggableDeviceProcessState::GetPluggableDeviceHostAllocator(
     tf_shared_lock lock(mu_);
     if (static_cast<int>(pluggable_device_host_allocators_.size()) >
         numa_node) {
+      VLOG(1) << "************PluggableDeviceProcessState::"
+                 "GetPluggableDeviceHostAllocator 1";
       return pluggable_device_host_allocators_[0].allocator.get();
     }
   }
+
+  VLOG(1) << "************PluggableDeviceProcessState::"
+                 "GetPluggableDeviceHostAllocator 2";
 
   mutex_lock lock(mu_);
   // Find the first valid StreamExecutor to request PluggableDevice host memory

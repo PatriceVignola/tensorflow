@@ -38,6 +38,7 @@ using tensorflow::errors::InvalidArgument;
 namespace tensorflow {
 void* allocate_tensor(const char* operation, size_t len, Allocator* allocator) {
   void* data = allocator->AllocateRaw(EIGEN_MAX_ALIGN_BYTES, len);
+  printf("***************allocate_tensor: %p\n", data);
   if (LogMemory::IsEnabled() && data != nullptr) {
     LogMemory::RecordRawAllocation(
         operation, LogMemory::EXTERNAL_TENSOR_ALLOCATION_STEP_ID, len, data,

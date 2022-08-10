@@ -148,6 +148,10 @@ Status LocalRendezvous::Send(const Rendezvous::ParsedKey& key,
     // TODO(b/143786186): Investigate moving the allocation of `Item` outside
     // the lock.
     DVLOG(2) << "Enqueue Send Item (key:" << key.FullKey() << "). ";
+
+    VLOG(1) << "**********Enqueuing item: send_args.alloc_attrs.on_host()="
+            << send_args.alloc_attrs.on_host() << ", val.data()=" << val.data();
+
     queue->push_back(new Item(send_args, val, is_dead));
     mu_.unlock();
     return OkStatus();
@@ -342,6 +346,14 @@ void LocalRendezvous::RecvAsync(const Rendezvous::ParsedKey& key,
   // Invoke the done-callback, without holding the lock.
   mu_.unlock();
   DCHECK_EQ(item->type, Item::kSend);
+
+  VLOG(1) << "LocalRendezvous::RecvAsync2 item->send_state.value->data(): "
+          << item->send_state.value->data();
+  VLOG(1) << "LocalRendezvous::RecvAsync2 item->args on_host: "
+          << item->args.alloc_attrs.on_host();
+  VLOG(1) << "LocalRendezvous::RecvAsync2 recv_args on_host: "
+          << recv_args.alloc_attrs.on_host();
+
   done(OkStatus(), item->args, recv_args, *item->send_state.value,
        item->send_state.is_dead);
   delete item;

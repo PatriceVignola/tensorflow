@@ -222,6 +222,8 @@ void PluggableDeviceUtil::CopyCPUTensorToPluggableDevice(
     const Tensor* cpu_tensor, const DeviceContext* device_context,
     Device* device, Tensor* device_tensor, StatusCallback done,
     bool sync_dst_compute) {
+  printf("PluggableDeviceUtil::CopyCPUTensorToPluggableDevice cpu_tensor: %p\n", cpu_tensor->data());
+  printf("PluggableDeviceUtil::CopyCPUTensorToPluggableDevice device_tensor: %p\n", device_tensor->data());
   VLOG(1) << "CopyCPUTensorToPluggableDevice";
   const DeviceBase::AcceleratorDeviceInfo* dev_info = nullptr;
   se::Stream* recv_stream = nullptr;

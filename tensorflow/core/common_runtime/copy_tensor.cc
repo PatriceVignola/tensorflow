@@ -206,6 +206,12 @@ void CopyTensor::ViaDMA(StringPiece edge_name, DeviceContext* send_dev_context,
                         const Tensor* input, Tensor* output,
                         int dev_to_dev_stream_index, StatusCallback done,
                         bool sync_dst_compute) {
+  printf("CopyTensor::ViaDMA input->data(): %p\n", input->data());
+  printf("CopyTensor::ViaDMA output->data(): %p\n", output->data());
+  printf("CopyTensor::ViaDMA src->name(): %s\n", src->name().c_str());
+  printf("CopyTensor::ViaDMA dst->name(): %s\n", dst->name().c_str());
+  printf("CopyTensor::ViaDMA src_alloc_attr.on_host(): %d\n", src_alloc_attr.on_host());
+  printf("CopyTensor::ViaDMA dst_alloc_attr.on_host(): %d\n", dst_alloc_attr.on_host());
   profiler::ScopedAnnotation annotation(
       [&] { return absl::StrCat("#edge_name=", edge_name, "#"); });
   VLOG(1) << "Copy " << edge_name;

@@ -69,8 +69,8 @@ limitations under the License.
 #if !defined(IS_MOBILE_PLATFORM)
 #include "tensorflow/core/distributed_runtime/eager/eager_client.h"
 #include "tensorflow/core/distributed_runtime/eager/remote_copy_node.h"
-#include "tensorflow/core/distributed_runtime/eager/remote_mgr.h"
 #include "tensorflow/core/distributed_runtime/eager/remote_execute_node.h"
+#include "tensorflow/core/distributed_runtime/eager/remote_mgr.h"
 #include "tensorflow/core/protobuf/remote_tensor_handle.pb.h"
 #endif  // IS_MOBILE_PLATFORM
 #include "tensorflow/core/common_runtime/eager/eager_op_rewrite_registry.h"
@@ -313,8 +313,14 @@ bool IsHostMemoryArg(const EagerOperation& op, const NodeDef* node_def,
   const auto& host_memory_args = kernel_def->host_memory_arg();
   const OpDef& op_def = OpRegistry::Global()->LookUp(op.Name())->op_def;
   const int arg_id = OpPortIdToArgId(*node_def, op_def.input_arg(), port_id);
-  return std::find(host_memory_args.begin(), host_memory_args.end(),
-                   op_def.input_arg(arg_id).name()) != host_memory_args.end();
+  bool abc =
+      std::find(host_memory_args.begin(), host_memory_args.end(),
+                op_def.input_arg(arg_id).name()) != host_memory_args.end();
+
+  VLOG(1) << "******************IsHostMemoryArg: abc=" << abc
+          << ", op_device->name()=" << op_device->name();
+
+  return abc;
 }
 
 Status GetDeviceForInput(const EagerOperation& op, const EagerContext& ctx,
@@ -1256,7 +1262,7 @@ Status CreateUnshapedOutput(
 #if defined(IS_MOBILE_PLATFORM)
   return errors::Unimplemented(
       "Remote outputs are not available on mobile devices.");
-#else  // !IS_MOBILE_PLATFORM
+#else   // !IS_MOBILE_PLATFORM
   int64_t op_id;
   if (eager_func_params.has_value()) {
     op_id = eager_func_params.value().op_id;
@@ -1299,7 +1305,7 @@ Status AddOrExecuteNode(core::RefCountPtr<KernelAndDevice> kernel,
 #if defined(IS_MOBILE_PLATFORM)
     return errors::Unimplemented(
         "Cross-process functions are not supported on mobile devices.");
-#else  // !IS_MOBILE_PLATFORM
+#else   // !IS_MOBILE_PLATFORM
     const int64_t op_id = ctx.RemoteMgr()->NextOpId();
     eager_func_params = EagerFunctionParams{
         op_id, /* is_component_function= */ false, /* step_id= */ std::nullopt};
@@ -1721,7 +1727,7 @@ Status GetKernelOutputs(
 #if defined(IS_MOBILE_PLATFORM)
         return errors::Unimplemented(
             "Remote outputs are not available on mobile devices.");
-#else  // !IS_MOBILE_PLATFORM
+#else   // !IS_MOBILE_PLATFORM
         TF_RETURN_IF_ERROR(retvals[i]->SetRemoteShape(
             absl::get<TensorShape>(ret), retvals[i]->device(),
             ctx->GetContextViewId()));
